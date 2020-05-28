@@ -2651,7 +2651,7 @@ namespace olc
 #endif
 
 	#define ATTRIB_POS 0
-	#define ATTRIB_UV0 1
+	#define ATTRIB_UV0 2
 
 	/**
 	 * @brief This class manages the pixel and vertex shader to give us an old school fixed function pipeline.
@@ -2674,6 +2674,7 @@ namespace olc
 
 		void Set2DProjection(float pWidth,float pHeight)
 		{ 
+			std::cout << "Set2DProjection(" << pWidth << "," << pHeight << ") " << std::flush;
 			// Store for later.
 			proj2d[ 0] = 2.0f / pWidth;
 			proj2d[ 1] = 0;
@@ -2701,7 +2702,8 @@ namespace olc
 			// There was a time I would use a look up table to go from byte to float.
 			// But we should good here. I will use the GPU! The red / 255.0f will be done in shader. :D
 			// still have to cast. :/
-			glUniform4f((GLfloat)u_global_colour,(GLfloat)red,(GLfloat)green,(GLfloat)blue,(GLfloat)alpha);
+//			glUniform4f((GLfloat)u_global_colour,(GLfloat)red,(GLfloat)green,(GLfloat)blue,(GLfloat)alpha);
+			glUniform4f((GLfloat)u_global_colour,1,1,1,1);
 			CHECK_OGL_ERRORS();
 		}
 
@@ -2739,15 +2741,15 @@ namespace olc
 			const char* vertex = ""	                                    \
 				"uniform mat4 u_projection;\n"	                        \
 				"uniform vec4 u_global_colour;\n" 	                    \
-				"attribute vec2 a_xy;\n"		                        \
+				"attribute vec4 a_xy;\n"		                        \
 				"attribute vec2 a_uv0;\n"		                        \
 				"varying vec4 v_col;\n"		                            \
 				"varying vec2 v_tex0;\n"		                        \
 				"void main(void)\n"		                                \
 				"{\n"		                        	                \
-				"	v_col = (u_global_colour / 255.0);\n"	            \
+				"	v_col = u_global_colour;\n"            \
 				"	v_tex0 = a_uv0;\n" 	                                		\
-				"	gl_Position = u_projection * vec4(a_xy.x,a_xy.y,0,1);\n"	\
+				"	gl_Position = u_projection * a_xy;\n"	\
 				"}\n";
 
 			const char *fragment = ""		                              \
@@ -2756,7 +2758,8 @@ namespace olc
 				"uniform sampler2D u_tex0;\n"							  \
 				"void main(void)\n"			                              \
 				"{\n"		                        	                  \
-				"	gl_FragColor = v_col * texture2D(u_tex0,v_tex0);\n"	  \
+				"	vec4 pixel = v_col * texture2D(u_tex0,v_tex0);\n"	  \
+				"   gl_FragColor = pixel;" \
 				"}\n";
 
 
@@ -2821,9 +2824,9 @@ namespace olc
 		 * @param offset 
 		 * @param streamData 
 		 */
-		void FillVertexStream(int streamIndex,int elementCount, int dataType,bool normalised,const GLvoid* streamData)
+		void FillVertexStream(int streamIndex,int elementCount, int dataType,const GLvoid* streamData)
 		{
-			glVertexAttribPointer(streamIndex,elementCount,dataType,normalised,0, streamData);
+			glVertexAttribPointer(streamIndex,elementCount,dataType,dataType == GL_BYTE,0, streamData);
 			CHECK_OGL_ERRORS();
 			glEnableVertexAttribArray(streamIndex);
 			CHECK_OGL_ERRORS();
@@ -2907,6 +2910,8 @@ namespace olc
 		EGLContext m_context;						//!<GL rendering context
 		EGLConfig m_config;							//!<Configuration of the display.
 		EGLint m_major_version,m_minor_version;		//!<Version number of OpenGLES we are running on.
+
+	    EGL_DISPMANX_WINDOW_T native_window;		//!< DO NOT ALLOW TO BE FREED. IF YOu DO DISPLAY WILL STOP. BAD driver BAD! The RPi window object needed to create the render surface.
 
 		// The fixed function pipeline so we can do all the 2D.
 		FixedFunctionPipeLine Shader;
@@ -3072,7 +3077,6 @@ namespace olc
 			0/*layer*/, &dst_rect, 0/*src*/,
 			&src_rect, DISPMANX_PROTECTION_NONE, &alpha /*alpha*/, 0/*clamp*/, DISPMANX_NO_ROTATE/*transform*/);
 
-		    EGL_DISPMANX_WINDOW_T native_window;		//!<The RPi window object needed to create the render surface.
 			memset(&native_window,0,sizeof(native_window));
 
 			native_window.element = dispman_element;
@@ -3095,7 +3099,7 @@ namespace olc
 
 		//	glColorMask(EGL_TRUE,EGL_TRUE,EGL_TRUE,EGL_FALSE);
 
-			if( bVSYNC )
+			if(  bVSYNC )
 			{
 				eglSwapInterval(m_display,1);
 			}
@@ -3138,12 +3142,22 @@ namespace olc
 
 		void PrepareDrawing() override
 		{
-//			glDisable(GL_DEPTH_TEST);
-//			glDepthMask(GL_FALSE);
+			glDisable(GL_DEPTH_TEST);
+			glDepthMask(GL_FALSE);
 			CHECK_OGL_ERRORS();
 
-//			glEnable(GL_BLEND);
-//			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+//	glEnable(GL_DEPTH_TEST);
+//	glDepthFunc(GL_LESS);
+//	glDepthMask(true);
+
+	glDisable(GL_CULL_FACE);
+	glFrontFace(GL_CW);
+	glCullFace(GL_BACK);
+
+			glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+			glBlendEquation(GL_FUNC_ADD);
+			glEnable(GL_BLEND);
+
 			CHECK_OGL_ERRORS();
 
 			Shader.Enable();
@@ -3186,14 +3200,13 @@ namespace olc
 				1.0f * scale.x + offset.x, 1.0f * scale.y + offset.y
 			};
 
-
-			Shader.FillVertexStream(ATTRIB_POS,2,GL_FLOAT,false,xy);
-			Shader.FillVertexStream(ATTRIB_UV0,2,GL_FLOAT,false,uv);
+			Shader.FillVertexStream(ATTRIB_POS,2,GL_FLOAT,xy);
+			Shader.FillVertexStream(ATTRIB_UV0,2,GL_FLOAT,uv);
 			Shader.setGlobalColour(tint.r, tint.g, tint.b, tint.a);
 
-			Shader.setTexture(WhiteTexture);
+//			Shader.setTexture(WhiteTexture);
 
-//			glDrawArrays(GL_TRIANGLES,0,2);		
+			glDrawArrays(GL_TRIANGLES,0,6);
 			CHECK_OGL_ERRORS();
 		}
 
@@ -3231,14 +3244,13 @@ namespace olc
 				decal.uv[3].x, decal.uv[3].y
 			};
 
-			Shader.FillVertexStream(ATTRIB_POS,2,GL_FLOAT,false,xy);
-			Shader.FillVertexStream(ATTRIB_UV0,2,GL_FLOAT,false,uv);
+			Shader.FillVertexStream(ATTRIB_POS,6,GL_FLOAT,xy);
+			Shader.FillVertexStream(ATTRIB_UV0,6,GL_FLOAT,uv);
 			Shader.setGlobalColour(decal.tint.r, decal.tint.g, decal.tint.b, decal.tint.a);
-
 
 			Shader.setTexture(decal.decal->id);
 
-//			glDrawArrays(GL_TRIANGLES,0,2);
+			glDrawArrays(GL_TRIANGLES,0,6);
 			CHECK_OGL_ERRORS();
 
 		}
@@ -3304,6 +3316,8 @@ namespace olc
 				pixels);
 
 			CHECK_OGL_ERRORS();
+
+//			glBindTexture(GL_TEXTURE_2D,0);
 		}
 
 		void UpdateTexture(uint32_t id, olc::Sprite* spr) override
@@ -3314,16 +3328,16 @@ namespace olc
 		void ApplyTexture(uint32_t id) override
 		{
 			glBindTexture(GL_TEXTURE_2D, id);
+			CHECK_OGL_ERRORS();
 		}
 
 		void ClearBuffer(olc::Pixel p, bool bDepth) override
 		{
 			glBindTexture(GL_TEXTURE_2D, 0);
 
-			std::cout << "." << std::flush;
-			p.r = rand()&255;
-			p.g = rand()&255;
-			p.b = rand()&255;
+			p.r = (rand()&0x08);
+			p.g = (rand()&0x08);
+			p.b = (rand()&0x08);
 		
 			glClearColor(float(p.r) / 255.0f, float(p.g) / 255.0f, float(p.b) / 255.0f, float(p.a) / 255.0f);
 
@@ -3341,9 +3355,8 @@ namespace olc
 
 		void UpdateViewport(const olc::vi2d& pos, const olc::vi2d& size) override
 		{
-			std::cout << "UpdateViewport(" << pos.x << "," << pos.y << "," << size.x << "," << size.y << ")" << std::endl;
-
 			glViewport(pos.x, pos.y, size.x, size.y);
+			CHECK_OGL_ERRORS();
 		}
 	};
 };
