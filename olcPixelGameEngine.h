@@ -2587,7 +2587,7 @@ namespace olc
 {
 
 #ifdef DEBUG_BUILD
-	#define CHECK_OGL_ERRORS()				CheckForGLErrors(__FILE__,__LINE__)
+	#define CHECK_OGL_ERRORS()		{CheckForGLErrors(__FILE__,__LINE__);}
 	#define FAIL_ON_OGL_ERROR()		{if(CheckForGLErrors(__FILE__,__LINE__) == false){return false;}}
 
 	/**
@@ -2674,7 +2674,6 @@ namespace olc
 
 		void Set2DProjection(float pWidth,float pHeight)
 		{ 
-			std::cout << "Set2DProjection(" << pWidth << "," << pHeight << ") " << std::flush;
 			// Store for later.
 			proj2d[ 0] = 2.0f / pWidth;
 			proj2d[ 1] = 0;
@@ -2702,8 +2701,7 @@ namespace olc
 			// There was a time I would use a look up table to go from byte to float.
 			// But we should good here. I will use the GPU! The red / 255.0f will be done in shader. :D
 			// still have to cast. :/
-//			glUniform4f((GLfloat)u_global_colour,(GLfloat)red,(GLfloat)green,(GLfloat)blue,(GLfloat)alpha);
-			glUniform4f((GLfloat)u_global_colour,1,1,1,1);
+			glUniform4f((GLfloat)u_global_colour,(GLfloat)red,(GLfloat)green,(GLfloat)blue,(GLfloat)alpha);
 			CHECK_OGL_ERRORS();
 		}
 
@@ -2747,19 +2745,19 @@ namespace olc
 				"varying vec2 v_tex0;\n"		                        \
 				"void main(void)\n"		                                \
 				"{\n"		                        	                \
-				"	v_col = u_global_colour;\n"            \
-				"	v_tex0 = a_uv0;\n" 	                                		\
-				"	gl_Position = u_projection * a_xy;\n"	\
+				"	v_col = u_global_colour;\n"            				\
+				"	v_tex0 = a_uv0;\n" 	                                \
+				"	gl_Position = u_projection * a_xy;\n"				\
 				"}\n";
 
-			const char *fragment = ""		                              \
-				"varying vec4 v_col;\n"		                              \
-				"varying vec2 v_tex0;\n"		                          \
-				"uniform sampler2D u_tex0;\n"							  \
-				"void main(void)\n"			                              \
-				"{\n"		                        	                  \
-				"	vec4 pixel = v_col * texture2D(u_tex0,v_tex0);\n"	  \
-				"   gl_FragColor = pixel;" \
+			const char *fragment = ""		                            \
+				"varying vec4 v_col;\n"		                            \
+				"varying vec2 v_tex0;\n"		                        \
+				"uniform sampler2D u_tex0;\n"							\
+				"void main(void)\n"			                            \
+				"{\n"		                        	                \
+				"	vec4 pixel = v_col * texture2D(u_tex0,v_tex0);\n"	\
+				"   gl_FragColor = pixel;" 								\
 				"}\n";
 
 
@@ -3097,8 +3095,6 @@ namespace olc
 			eglQuerySurface(m_display, m_surface,EGL_WIDTH,  &m_info.width);
 			eglQuerySurface(m_display, m_surface,EGL_HEIGHT, &m_info.height);
 
-		//	glColorMask(EGL_TRUE,EGL_TRUE,EGL_TRUE,EGL_FALSE);
-
 			if(  bVSYNC )
 			{
 				eglSwapInterval(m_display,1);
@@ -3142,17 +3138,16 @@ namespace olc
 
 		void PrepareDrawing() override
 		{
+			glBindTexture(GL_TEXTURE_2D,0);//Because we had to change it to setup the texture! Stupid GL!
+			CHECK_OGL_ERRORS();
+
 			glDisable(GL_DEPTH_TEST);
 			glDepthMask(GL_FALSE);
 			CHECK_OGL_ERRORS();
 
-//	glEnable(GL_DEPTH_TEST);
-//	glDepthFunc(GL_LESS);
-//	glDepthMask(true);
-
-	glDisable(GL_CULL_FACE);
-	glFrontFace(GL_CW);
-	glCullFace(GL_BACK);
+			glDisable(GL_CULL_FACE);
+			glFrontFace(GL_CW);
+			glCullFace(GL_BACK);
 
 			glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 			glBlendEquation(GL_FUNC_ADD);
@@ -3165,28 +3160,16 @@ namespace olc
 
 		void DrawLayerQuad(const olc::vf2d& offset, const olc::vf2d& scale, const olc::Pixel tint) override
 		{
-		//	glBegin(GL_QUADS);
-		//	glColor4ub(tint.r, tint.g, tint.b, tint.a);
-		//	glTexCoord2f(0.0f * scale.x + offset.x, 1.0f * scale.y + offset.y);
-		//	glVertex3f(-1.0f /*+ vSubPixelOffset.x*/, -1.0f /*+ vSubPixelOffset.y*/, 0.0f);
-		//	glTexCoord2f(0.0f * scale.x + offset.x, 0.0f * scale.y + offset.y);
-		//	glVertex3f(-1.0f /*+ vSubPixelOffset.x*/, 1.0f /*+ vSubPixelOffset.y*/, 0.0f);
-		//	glTexCoord2f(1.0f * scale.x + offset.x, 0.0f * scale.y + offset.y);
-		//	glVertex3f(1.0f /*+ vSubPixelOffset.x*/, 1.0f /*+ vSubPixelOffset.y*/, 0.0f);
-		//	glTexCoord2f(1.0f * scale.x + offset.x, 1.0f * scale.y + offset.y);
-		//	glVertex3f(1.0f /*+ vSubPixelOffset.x*/, -1.0f /*+ vSubPixelOffset.y*/, 0.0f);
-		//	glEnd();
-
 			// No quad prim here. So two tris wound in the correct direction.
 			const float xy[] =
 			{
+				0,m_info.heightF,
 				0,0,
 				m_info.widthF,0,
-				m_info.widthF,m_info.heightF,
 
-				0,0,
-				m_info.widthF,m_info.heightF,
-				0,m_info.heightF
+				0,m_info.heightF,
+				m_info.widthF,0,
+				m_info.widthF,m_info.heightF
 			};
 
 			const float uv[] =
@@ -3204,23 +3187,12 @@ namespace olc
 			Shader.FillVertexStream(ATTRIB_UV0,2,GL_FLOAT,uv);
 			Shader.setGlobalColour(tint.r, tint.g, tint.b, tint.a);
 
-//			Shader.setTexture(WhiteTexture);
-
 			glDrawArrays(GL_TRIANGLES,0,6);
 			CHECK_OGL_ERRORS();
 		}
 
 		void DrawDecalQuad(const olc::DecalInstance& decal) override
 		{
-//			glBindTexture(GL_TEXTURE_2D, decal.decal->id);
-//			glBegin(GL_QUADS);
-//			glColor4ub(decal.tint.r, decal.tint.g, decal.tint.b, decal.tint.a);
-//			glTexCoord4f(decal.uv[0].x, decal.uv[0].y, 0.0f, decal.w[0]); glVertex2f(decal.pos[0].x, decal.pos[0].y);
-//			glTexCoord4f(decal.uv[1].x, decal.uv[1].y, 0.0f, decal.w[1]); glVertex2f(decal.pos[1].x, decal.pos[1].y);
-//			glTexCoord4f(decal.uv[2].x, decal.uv[2].y, 0.0f, decal.w[2]); glVertex2f(decal.pos[2].x, decal.pos[2].y);
-//			glTexCoord4f(decal.uv[3].x, decal.uv[3].y, 0.0f, decal.w[3]); glVertex2f(decal.pos[3].x, decal.pos[3].y);
-//			glEnd();
-
 			// No quad prim here. So two tris wound in the correct direction.
 			const float xy[] =
 			{
@@ -3252,7 +3224,6 @@ namespace olc
 
 			glDrawArrays(GL_TRIANGLES,0,6);
 			CHECK_OGL_ERRORS();
-
 		}
 
 		uint32_t CreateTexture(const uint32_t width, const uint32_t height) override
@@ -3316,8 +3287,6 @@ namespace olc
 				pixels);
 
 			CHECK_OGL_ERRORS();
-
-//			glBindTexture(GL_TEXTURE_2D,0);
 		}
 
 		void UpdateTexture(uint32_t id, olc::Sprite* spr) override
@@ -3333,12 +3302,6 @@ namespace olc
 
 		void ClearBuffer(olc::Pixel p, bool bDepth) override
 		{
-			glBindTexture(GL_TEXTURE_2D, 0);
-
-			p.r = (rand()&0x08);
-			p.g = (rand()&0x08);
-			p.b = (rand()&0x08);
-		
 			glClearColor(float(p.r) / 255.0f, float(p.g) / 255.0f, float(p.b) / 255.0f, float(p.a) / 255.0f);
 
 			if( bDepth )

@@ -1,0 +1,80 @@
+{
+    "configurations": {
+        "debug": {
+            "default": true,
+            "target": "executable",
+            "compiler": "gcc",
+            "linker": "gcc",
+            "archiver": "ar",
+            "standard": "c++14",
+            "optimisation": "0",
+            "debug_level": "2",
+            "warnings_as_errors": false,
+            "enable_all_warnings": false,
+            "fatal_errors": false,
+            "include": [
+                "/usr/include/",
+                "./source/",
+                "/opt/vc/include/"
+            ],
+            "libs": [
+                "png",
+                "stdc++",
+                "pthread",
+                "m",
+                "brcmGLESv2",
+                "brcmEGL",
+                "bcm_host"
+            ],
+            "libpaths":
+            [
+                "/opt/vc/lib"
+            ],
+            "define": [
+                "DEBUG_BUILD",
+                "OLC_GFX_BCM_HOST_GLES20",
+                "OLC_PLATFORM_BASH"
+            ]
+        },
+        "release": {
+            "default": false,
+            "target": "executable",
+            "compiler": "gcc",
+            "linker": "gcc",
+            "archiver": "ar",
+            "standard": "c++14",
+            "optimisation": "2",
+            "debug_level": "0",
+            "warnings_as_errors": false,
+            "enable_all_warnings": false,
+            "fatal_errors": false,
+            "include": [
+                "/usr/include/",
+                "./source/",
+                "/opt/vc/include/"
+            ],
+            "libs": [
+                "png",
+                "stdc++",
+                "pthread",
+                "m",
+                "brcmGLESv2",
+                "brcmEGL",
+                "bcm_host"
+            ],
+            "libpaths":
+            [
+                "/opt/vc/lib"
+            ],
+            "define": [
+                "RELEASE_BUILD",
+                "OLC_GFX_BCM_HOST_GLES20",
+                "OLC_PLATFORM_BASH"
+            ]
+
+        }
+    },
+    "source_files": [
+        "./OneLoneCoder_PGE_IsometricTiles.cpp"
+    ]
+}
